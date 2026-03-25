@@ -1,0 +1,16 @@
+{
+  "name": "weight-log",
+  "version": "1.0.0",
+  "description": "SMS weight tracker via Twilio + Google Sheets + Cloudflare",
+  "private": true,
+  "scripts": {
+    "dev": "cd worker && wrangler dev",
+    "deploy:worker": "cd worker && wrangler deploy",
+    "deploy:dashboard": "wrangler pages deploy dashboard --project-name weight-log",
+    "deploy": "npm run deploy:worker && npm run deploy:dashboard",
+    "setup:sheets": "cd sheets-setup && node setup-sheet.js"
+  },
+  "workspaces": [
+    "worker"
+  ]
+}
