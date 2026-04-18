@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Weight Log</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f5f5f5;
+      color: #222;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #fff;
+      border-bottom: 1px solid #e5e5e5;
+      padding: 16px 24px;
+    }
+
+    header h1 { font-size: 1.2rem; font-weight: 600; }
+
+    main {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* ── Stats row ── */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    .stat-card {
+      background: #fff;
+      border: 1px solid #e5e5e5;
+      border-radius: 10px;
+      padding: 16px;
+    }
+
+    .stat-card .label { font-size: 0.75rem; color: #888; margin-bottom: 6px; }
+    .stat-card .value { font-size: 1.5rem; font-weight: 700; }
+    .stat-card .value.pos { color: #e53e3e; }
+    .stat-card .value.neg { color: #38a169; }
+
+    /* ── Chart card ── */
+    .chart-card {
+      background: #fff;
+      border: 1px solid #e5e5e5;
+      border-radius: 10px;
+      padding: 20px;
+    }
+
+    .range-tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+
+    .range-tabs button {
+      padding: 5px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      background: #fff;
+      cursor: pointer;
+      font-size: 0.85rem;
+      color: #555;
+    }
+
+    .range-tabs button.active {
+      background: #222;
+      color: #fff;
+      border-color: #222;
+    }
+
+    .chart-wrap { position: relative; height: 280px; }
+
+    /* ── Log form ── */
+    .log-form-card {
+      background: #fff;
+      border: 1px solid #e5e5e5;
+      border-radius: 10px;
+      padding: 20px;
+    }
+
+    .log-form-card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 14px; }
+
+    .form-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: flex-end;
+    }
+
+    .form-group { display: flex; flex-direction: column; gap: 4px; }
+    .form-group label { font-size: 0.75rem; color: #888; }
+
+    .form-group input {
+      padding: 8px 10px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      width: 140px;
+    }
+
+    .form-group input[name="note"] { width: 220px; }
+
+    button.submit-btn {
+      padding: 8px 18px;
+      background: #222;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    button.submit-btn:disabled { opacity: 0.5; cursor: default; }
+
+    .form-msg {
+      margin-top: 10px;
+      font-size: 0.85rem;
+      min-height: 1.2em;
+    }
+
+    .form-msg.ok { color: #38a169; }
+    .form-msg.err { color: #e53e3e; }
+
+    /* ── Log table ── */
+    .log-card {
+      background: #fff;
+      border: 1px solid #e5e5e5;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .log-card h2 { font-size: 1rem; font-weight: 600; padding: 16px 20px; border-bottom: 1px solid #e5e5e5; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    th { text-align: left; padding: 10px 20px; font-size: 0.75rem; color: #888; font-weight: 500; border-bottom: 1px solid #eee; }
+    td { padding: 10px 20px; border-bottom: 1px solid #f0f0f0; }
+    tr:last-child td { border-bottom: none; }
+    tr.note-row td { background: #fffbea; color: #555; font-style: italic; }
+
+    .change { font-size: 0.8rem; color: #888; margin-left: 6px; }
+    .change.pos { color: #e53e3e; }
+    .change.neg { color: #38a169; }
+
+    .error-msg { padding: 20px; color: #e53e3e; text-align: center; }
+
+    @media (max-width: 600px) {
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      .form-row { flex-direction: column; }
+      .form-group input, .form-group input[name="note"] { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>⚖️ Weight Log</h1>
+</header>
+
+<main>
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat-card">
+      <div class="label">Latest</div>
+      <div class="value" id="stat-latest">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">7-day change</div>
+      <div class="value" id="stat-7d">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">30-day change</div>
+      <div class="value" id="stat-30d">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">All-time change</div>
+      <div class="value" id="stat-all">—</div>
+    </div>
+  </div>
+
+  <!-- Chart -->
+  <div class="chart-card">
+    <div class="range-tabs" id="range-tabs">
+      <button data-range="30" class="active">30d</button>
+      <button data-range="90">90d</button>
+      <button data-range="180">6mo</button>
+      <button data-range="365">1yr</button>
+      <button data-range="all">All</button>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="chart"></canvas>
+    </div>
+  </div>
+
+  <!-- Log entry form -->
+  <div class="log-form-card">
+    <h2>Log Entry</h2>
+    <form id="entry-form">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Date</label>
+          <input type="date" name="date" required />
+        </div>
+        <div class="form-group">
+          <label>Time</label>
+          <input type="time" name="time" />
+        </div>
+        <div class="form-group">
+          <label>Weight (lbs)</label>
+          <input type="number" name="weight" step="0.1" min="50" max="999" placeholder="159.3" />
+        </div>
+        <div class="form-group">
+          <label>Note (optional)</label>
+          <input type="text" name="note" placeholder="ate out today" />
+        </div>
+        <button type="submit" class="submit-btn">Log</button>
+      </div>
+      <div class="form-msg" id="form-msg"></div>
+    </form>
+  </div>
+
+  <!-- Log table -->
+  <div class="log-card">
+    <h2>Log</h2>
+    <div id="log-container"></div>
+  </div>
+</main>
+
+<script>
+  // ── Config ──────────────────────────────────────────────────────────────────
+  // Set this to your deployed Cloudflare Worker URL before deploying
+  const API_BASE = 'https://weight-log.kayla-a-mandel.workers.dev';
+
+  // ── State ───────────────────────────────────────────────────────────────────
+  let allWeights = [];  // [{ date, time, value }]  chronological
+  let allNotes   = [];  // [{ date, time, note }]
+  let activeRange = 30;
+  let chart = null;
+
+  // ── Boot ────────────────────────────────────────────────────────────────────
+  prefillForm();
+  loadData();
+
+  // ── Load data ───────────────────────────────────────────────────────────────
+  async function loadData() {
+    try {
+      const [weightsRes, logRes] = await Promise.all([
+        fetch(`${API_BASE}/api/weights`),
+        fetch(`${API_BASE}/api/log`),
+      ]);
+      const { weights, notes } = await weightsRes.json();
+      const log = await logRes.json();
+
+      allWeights = weights;
+      allNotes = notes;
+
+      renderStats(weights);
+      renderChart(weights, notes, activeRange);
+      renderLog(log);
+    } catch (e) {
+      document.getElementById('log-container').innerHTML =
+        `<div class="error-msg">Could not load data. Make sure API_BASE is set to your Worker URL.</div>`;
+    }
+  }
+
+  // ── Stats ───────────────────────────────────────────────────────────────────
+  function renderStats(weights) {
+    if (!weights.length) return;
+    const latest = weights[weights.length - 1];
+    const first  = weights[0];
+
+    document.getElementById('stat-latest').textContent = `${latest.value} lbs`;
+
+    setChangeStat('stat-7d',  latest.value, findValueDaysAgo(weights, 7));
+    setChangeStat('stat-30d', latest.value, findValueDaysAgo(weights, 30));
+    setChangeStat('stat-all', latest.value, first.value);
+  }
+
+  function findValueDaysAgo(weights, days) {
+    const cutoff = Date.now() - days * 864e5;
+    for (let i = weights.length - 1; i >= 0; i--) {
+      if (new Date(weights[i].date).getTime() <= cutoff) return weights[i].value;
+    }
+    return null;
+  }
+
+  function setChangeStat(id, current, baseline) {
+    const el = document.getElementById(id);
+    if (baseline == null) { el.textContent = '—'; return; }
+    const diff = current - baseline;
+    const sign = diff > 0 ? '+' : '';
+    el.textContent = `${sign}${diff.toFixed(1)} lbs`;
+    el.className = 'value ' + (diff > 0 ? 'pos' : diff < 0 ? 'neg' : '');
+  }
+
+  // ── Chart ───────────────────────────────────────────────────────────────────
+  function renderChart(weights, notes, range) {
+    const filtered = filterByRange(weights, range);
+    const labels = filtered.map(w => w.date);
+    const values = filtered.map(w => w.value);
+    const avgLine = rollingAvg(values, 7);
+
+    // Note markers: find notes whose date appears in the chart range
+    const labelIndex = new Map(labels.map((d, i) => [d, i]));
+    const notePoints = notes
+      .filter(n => labelIndex.has(n.date))
+      .map(n => ({ x: labelIndex.get(n.date), y: values[labelIndex.get(n.date)], note: n.note }));
+
+    const ctx = document.getElementById('chart').getContext('2d');
+    if (chart) chart.destroy();
+
+    chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Weight',
+            data: values,
+            borderColor: '#555',
+            backgroundColor: 'transparent',
+            pointRadius: 3,
+            pointHoverRadius: 5,
+            tension: 0.2,
+            order: 2,
+          },
+          {
+            label: '7-day avg',
+            data: avgLine,
+            borderColor: '#3b82f6',
+            backgroundColor: 'transparent',
+            pointRadius: 0,
+            borderWidth: 2,
+            tension: 0.4,
+            order: 1,
+          },
+          {
+            label: 'Notes',
+            data: notePoints.map(n => ({ x: n.x, y: n.y })),
+            backgroundColor: '#f59e0b',
+            borderColor: '#f59e0b',
+            pointRadius: 6,
+            pointStyle: 'triangle',
+            showLine: false,
+            order: 0,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              afterBody(items) {
+                const idx = items[0]?.dataIndex;
+                if (idx == null) return;
+                const date = labels[idx];
+                return notes.filter(n => n.date === date).map(n => `📝 ${n.note}`);
+              },
+            },
+          },
+        },
+        scales: {
+          x: { ticks: { maxTicksLimit: 8, maxRotation: 0 } },
+          y: { ticks: { callback: v => `${v}` } },
+        },
+      },
+    });
+  }
+
+  function filterByRange(weights, range) {
+    if (range === 'all') return weights;
+    const cutoff = Date.now() - range * 864e5;
+    return weights.filter(w => new Date(w.date).getTime() >= cutoff);
+  }
+
+  function rollingAvg(values, window) {
+    return values.map((_, i) => {
+      const slice = values.slice(Math.max(0, i - window + 1), i + 1);
+      return slice.reduce((a, b) => a + b, 0) / slice.length;
+    });
+  }
+
+  // ── Range tabs ──────────────────────────────────────────────────────────────
+  document.getElementById('range-tabs').addEventListener('click', e => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    document.querySelectorAll('.range-tabs button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeRange = btn.dataset.range === 'all' ? 'all' : parseInt(btn.dataset.range);
+    renderChart(allWeights, allNotes, activeRange);
+  });
+
+  // ── Log table ───────────────────────────────────────────────────────────────
+  function renderLog(log) {
+    if (!log.length) {
+      document.getElementById('log-container').innerHTML =
+        '<div style="padding:20px;color:#888;text-align:center">No entries yet.</div>';
+      return;
+    }
+
+    const rows = [];
+    let prevWeight = null;
+
+    for (const entry of log) {
+      if (entry.type === 'weight') {
+        let changeHtml = '';
+        if (prevWeight !== null) {
+          const diff = parseFloat(entry.value) - prevWeight;
+          const sign = diff > 0 ? '+' : '';
+          const cls = diff > 0 ? 'pos' : diff < 0 ? 'neg' : '';
+          changeHtml = `<span class="change ${cls}">${sign}${diff.toFixed(1)}</span>`;
+        }
+        rows.push(`<tr>
+          <td>${entry.date}</td>
+          <td>${entry.time || ''}</td>
+          <td>${entry.value} lbs ${changeHtml}</td>
+        </tr>`);
+        prevWeight = parseFloat(entry.value);
+      } else {
+        rows.push(`<tr class="note-row">
+          <td>${entry.date}</td>
+          <td>${entry.time || ''}</td>
+          <td>📝 ${entry.note}</td>
+        </tr>`);
+      }
+    }
+
+    document.getElementById('log-container').innerHTML = `
+      <table>
+        <thead><tr><th>Date</th><th>Time</th><th>Entry</th></tr></thead>
+        <tbody>${rows.join('')}</tbody>
+      </table>`;
+  }
+
+  // ── Log entry form ──────────────────────────────────────────────────────────
+  function prefillForm() {
+    const form = document.getElementById('entry-form');
+    form.date.value = new Date().toISOString().slice(0, 10);
+    form.time.value = new Date().toTimeString().slice(0, 5);
+  }
+
+  document.getElementById('entry-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const form = e.target;
+    const msg = document.getElementById('form-msg');
+    const btn = form.querySelector('button[type=submit]');
+
+    msg.textContent = '';
+    msg.className = 'form-msg';
+    btn.disabled = true;
+
+    try {
+      const res = await fetch(`${API_BASE}/api/entry`, { method: 'POST', body: new FormData(form) });
+      const json = await res.json();
+      if (!res.ok || json.error) throw new Error(json.error || 'Server error');
+
+      msg.textContent = 'Logged!';
+      msg.className = 'form-msg ok';
+      form.weight.value = '';
+      form.note.value = '';
+      await loadData();
+    } catch (err) {
+      msg.textContent = err.message;
+      msg.className = 'form-msg err';
+    } finally {
+      btn.disabled = false;
+    }
+  });
+</script>
+
+</body>
+</html>

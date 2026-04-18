@@ -1,0 +1,7 @@
+name = "weight-log"
+main = "index.js"
+compatibility_date = "2024-01-01"
+
+# Optional: set your local timezone for date/time display
+# [vars]
+# TIMEZONE = "America/Chicago"

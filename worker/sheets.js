@@ -168,11 +168,11 @@ export async function getAllRows(env, token) {
   const values = data.values || [];
 
   return values.slice(1).map(row => ({
-    date: row[0] || '',
-    time: row[1] || '',
-    type: row[2] || 'weight',
+    date:  row[0] || '',
+    time:  row[1] || '',
+    type:  row[2] || 'weight',
     value: row[3] || '',
-    note: row[4] || '',
+    note:  row[4] || '',
   })).filter(r => r.date);
 }
 
